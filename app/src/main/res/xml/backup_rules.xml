@@ -1,0 +1,5 @@
+<full-backup-content>
+    <include
+        domain="database"
+        path="weather_cache.db" />
+</full-backup-content>
