@@ -30,5 +30,6 @@ class AppContainer(context: Context) {
         cacheDataSource = cacheDataSource,
         geocodingService = apiClient.geocodingService,
         forecastService = apiClient.forecastService,
+        apiKey = BuildConfig.WEATHER_API_KEY,
     )
 }

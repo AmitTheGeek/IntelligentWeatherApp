@@ -8,22 +8,28 @@ import com.example.weatherintelligence.data.remote.ForecastService
 import com.example.weatherintelligence.data.remote.GeocodingResult
 import com.example.weatherintelligence.data.remote.GeocodingService
 import com.example.weatherintelligence.data.remote.HourlyDto
+import com.example.weatherintelligence.data.remote.WeatherConditionDto
 import com.example.weatherintelligence.domain.CachedCity
 import com.example.weatherintelligence.domain.CurrentWeather
 import com.example.weatherintelligence.domain.DailyForecast
 import com.example.weatherintelligence.domain.HourlyForecast
+import com.example.weatherintelligence.domain.OpenWeatherCode
 import com.example.weatherintelligence.domain.RefreshPolicy
-import com.example.weatherintelligence.domain.WeatherCode
 import com.example.weatherintelligence.domain.WeatherSnapshot
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 class WeatherRepository(
     private val cacheDataSource: WeatherCacheDataSource,
     private val geocodingService: GeocodingService,
     private val forecastService: ForecastService,
+    private val apiKey: String,
     private val refreshPolicy: RefreshPolicy = RefreshPolicy(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -68,6 +74,7 @@ class WeatherRepository(
             val response = forecastService.forecast(
                 latitude = location.latitude,
                 longitude = location.longitude,
+                apiKey = requireApiKey(),
             )
             val snapshot = response.toSnapshot(
                 queryKey = queryKey,
@@ -82,9 +89,17 @@ class WeatherRepository(
     }
 
     private suspend fun geocode(query: String): WeatherLocation {
-        val result = geocodingService.searchCity(query).results.firstOrNull()
+        val result = geocodingService.searchCity(query = query, apiKey = requireApiKey()).firstOrNull()
             ?: throw IllegalArgumentException("No location found for \"$query\"")
         return result.toLocation()
+    }
+
+    private fun requireApiKey(): String {
+        val trimmedApiKey = apiKey.trim()
+        check(trimmedApiKey.isNotEmpty()) {
+            "Missing WEATHER_API_KEY. Add it to local.properties before running the app."
+        }
+        return trimmedApiKey
     }
 
     private fun String.toQueryKey(): String = WeatherCacheKeys.fromQuery(this.ifBlank { DEFAULT_CITY })
@@ -106,16 +121,16 @@ class WeatherRepository(
     )
 
     private fun GeocodingResult.toLocation(): WeatherLocation {
-        val displayCountry = listOfNotNull(adminArea, country)
+        val displayCountry = listOfNotNull(state, country)
             .distinct()
             .joinToString(", ")
             .ifBlank { "Unknown region" }
         return WeatherLocation(
             cityName = name,
             country = displayCountry,
-            latitude = latitude,
-            longitude = longitude,
-            timezone = timezone ?: "auto",
+            latitude = lat,
+            longitude = lon,
+            timezone = "UTC",
         )
     }
 
@@ -125,67 +140,87 @@ class WeatherRepository(
         nowEpochMillis: Long,
     ): WeatherSnapshot {
         val currentDto = current ?: throw IllegalStateException("Weather response is missing current conditions.")
-        val code = currentDto.weatherCode ?: 3
+        val zoneId = timezone.zoneIdOrUtc()
+        val providerCode = currentDto.weather.primaryProviderCode()
+        val code = OpenWeatherCode.normalize(providerCode)
         val currentWeather = CurrentWeather(
-            temperatureC = currentDto.temperature ?: 0.0,
-            feelsLikeC = currentDto.apparentTemperature ?: currentDto.temperature ?: 0.0,
+            temperatureC = currentDto.temp ?: 0.0,
+            feelsLikeC = currentDto.feelsLike ?: currentDto.temp ?: 0.0,
             humidityPercent = currentDto.humidity ?: 0,
-            windKph = currentDto.windSpeed ?: 0.0,
-            gustKph = currentDto.windGusts ?: currentDto.windSpeed ?: 0.0,
+            windKph = currentDto.windSpeed.metersPerSecondToKph(),
+            gustKph = currentDto.windGust.metersPerSecondToKph().takeIf { it > 0.0 }
+                ?: currentDto.windSpeed.metersPerSecondToKph(),
             weatherCode = code,
-            condition = WeatherCode.labelFor(code),
+            condition = OpenWeatherCode.labelFor(providerCode, currentDto.weather.firstOrNull()?.description),
         )
 
         return WeatherSnapshot(
             queryKey = queryKey,
             cityName = location.cityName,
             country = location.country,
-            latitude = location.latitude,
-            longitude = location.longitude,
+            latitude = lat ?: location.latitude,
+            longitude = lon ?: location.longitude,
             timezone = timezone ?: location.timezone,
             current = currentWeather,
-            hourly = hourly.toHourlyForecasts(currentWeather).take(24),
-            daily = daily.toDailyForecasts(),
+            hourly = hourly.toHourlyForecasts(currentWeather, zoneId).take(24),
+            daily = daily.toDailyForecasts(zoneId),
             updatedAtEpochMillis = nowEpochMillis,
         )
     }
 
-    private fun HourlyDto?.toHourlyForecasts(current: CurrentWeather): List<HourlyForecast> {
-        if (this == null) return emptyList()
-        val count = minOf(time.size, temperature.size, precipitationProbability.size, weatherCode.size, windSpeed.size)
-        return (0 until count).map { index ->
-            val code = weatherCode[index] ?: current.weatherCode
+    private fun List<HourlyDto>.toHourlyForecasts(
+        current: CurrentWeather,
+        zoneId: ZoneId,
+    ): List<HourlyForecast> {
+        return map { forecast ->
+            val providerCode = forecast.weather.firstOrNull()?.id
+            val code = providerCode?.let(OpenWeatherCode::normalize) ?: current.weatherCode
             HourlyForecast(
-                timeIso = time[index],
-                temperatureC = temperature[index] ?: current.temperatureC,
-                precipitationProbability = precipitationProbability[index] ?: 0,
-                windKph = windSpeed[index] ?: current.windKph,
+                timeIso = forecast.dt.toIsoDateTime(zoneId),
+                temperatureC = forecast.temp ?: current.temperatureC,
+                precipitationProbability = forecast.pop.toPercent(),
+                windKph = forecast.windSpeed.metersPerSecondToKph(),
                 weatherCode = code,
             )
         }
     }
 
-    private fun DailyDto?.toDailyForecasts(): List<DailyForecast> {
-        if (this == null) return emptyList()
-        val count = minOf(
-            time.size,
-            temperatureMax.size,
-            temperatureMin.size,
-            precipitationProbability.size,
-            weatherCode.size,
-            windSpeed.size,
-        )
-        return (0 until count).map { index ->
+    private fun List<DailyDto>.toDailyForecasts(
+        zoneId: ZoneId,
+    ): List<DailyForecast> {
+        return map { forecast ->
+            val providerCode = forecast.weather.primaryProviderCode()
             DailyForecast(
-                dateIso = time[index],
-                minTemperatureC = temperatureMin[index] ?: 0.0,
-                maxTemperatureC = temperatureMax[index] ?: 0.0,
-                precipitationProbability = precipitationProbability[index] ?: 0,
-                windKph = windSpeed[index] ?: 0.0,
-                weatherCode = weatherCode[index] ?: 3,
+                dateIso = forecast.dt.toIsoDate(zoneId),
+                minTemperatureC = forecast.temp?.min ?: 0.0,
+                maxTemperatureC = forecast.temp?.max ?: 0.0,
+                precipitationProbability = forecast.pop.toPercent(),
+                windKph = forecast.windSpeed.metersPerSecondToKph(),
+                weatherCode = OpenWeatherCode.normalize(providerCode),
             )
         }
     }
+
+    private fun List<WeatherConditionDto>.primaryProviderCode(fallback: Int = 804): Int =
+        firstOrNull()?.id ?: fallback
+
+    private fun Double?.metersPerSecondToKph(): Double = (this ?: 0.0) * 3.6
+
+    private fun Double?.toPercent(): Int = (((this ?: 0.0) * 100).roundToInt()).coerceIn(0, 100)
+
+    private fun Long?.toIsoDateTime(zoneId: ZoneId): String {
+        val instant = Instant.ofEpochSecond(this ?: 0L)
+        return instant.atZone(zoneId).toLocalDateTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+    }
+
+    private fun Long?.toIsoDate(zoneId: ZoneId): String {
+        val instant = Instant.ofEpochSecond(this ?: 0L)
+        return instant.atZone(zoneId).toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+    }
+
+    private fun String?.zoneIdOrUtc(): ZoneId = runCatching {
+        ZoneId.of(this ?: "UTC")
+    }.getOrDefault(ZoneId.of("UTC"))
 
     private data class WeatherLocation(
         val cityName: String,

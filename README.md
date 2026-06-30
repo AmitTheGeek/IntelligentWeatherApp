@@ -10,7 +10,7 @@ Native Android weather intelligence app built for the assignment brief. It provi
 - Offline-first cache backed by a local SQLite database.
 - Cache-per-city rows with last-updated timestamps.
 - Smart refresh using a 30-minute TTL.
-- Retrofit networking against the public Open-Meteo APIs.
+- Retrofit networking against OpenWeather APIs.
 - Coroutines and Flow for database observation plus API refresh.
 - WorkManager periodic sync for cached cities.
 - Severe weather notification support for storms, heavy rain, and high winds.
@@ -24,7 +24,7 @@ The project uses a compact MVVM + Repository structure:
 - `ui/` contains Jetpack Compose screens and `WeatherViewModel`.
 - `data/repository/WeatherRepository.kt` coordinates cache, TTL, geocoding, forecast refresh, and offline fallback.
 - `data/local/` contains a direct SQLite cache implementation used as the source of truth.
-- `data/remote/` contains Retrofit services and Open-Meteo DTOs.
+- `data/remote/` contains Retrofit services and OpenWeather DTOs.
 - `domain/` contains app models, weather-code mapping, refresh policy, and severe-weather detection.
 - `sync/WeatherSyncWorker.kt` performs periodic background refresh through WorkManager.
 - `notifications/WeatherNotifier.kt` owns notification channel creation and alert display.
@@ -37,21 +37,28 @@ Flow direction:
 4. Successful API responses are written back into SQLite.
 5. SQLite updates are emitted through Flow and redraw the Compose UI.
 
-## API
+## API Key
 
-The app uses Open-Meteo because it is public and does not require an API key:
+The app uses OpenWeather and expects an API key at build time. Keep the key in `local.properties`, which is ignored by Git:
 
-- Geocoding: `https://geocoding-api.open-meteo.com/v1/search`
-- Forecast: `https://api.open-meteo.com/v1/forecast`
+```properties
+WEATHER_API_KEY=your_openweather_api_key
+```
+
+Do not commit API keys, paste them into README files, or log them from the app. Gradle reads the value from `local.properties`, or from a `WEATHER_API_KEY` environment variable when the local property is absent, and exposes it to the app as `BuildConfig.WEATHER_API_KEY`.
+
+Endpoints used:
+
+- Geocoding: `https://api.openweathermap.org/geo/1.0/direct`
+- Forecast: `https://api.openweathermap.org/data/3.0/onecall`
 
 ## Setup
 
 1. Open the project in Android Studio.
 2. Use JDK 17 or Android Studio's bundled JBR.
-3. Sync Gradle.
-4. Run the `app` configuration on an emulator or device.
-
-No API key is required.
+3. Add `WEATHER_API_KEY` to `local.properties`, or export it as an environment variable before building.
+4. Sync Gradle.
+5. Run the `app` configuration on an emulator or device.
 
 ## Build And Test
 
@@ -67,7 +74,7 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## Assumptions
 
-- Open-Meteo does not provide official weather-alert bulletins in the free no-key forecast endpoint, so the app derives local severe-weather signals from wind, gusts, precipitation probability, and thunderstorm weather codes.
+- The app derives local severe-weather signals from wind, gusts, precipitation probability, and thunderstorm weather codes rather than relying on provider alert bulletins.
 - The cache TTL is 30 minutes, which balances freshness and network usage for an assignment app.
 - Searched city names are normalized and used as cache keys. The resolved city metadata and coordinates are stored with the cached forecast.
 - Background sync requires network connectivity and refreshes only tracked cached cities.
