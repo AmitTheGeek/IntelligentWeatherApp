@@ -72,6 +72,10 @@ The debug APK is generated at:
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Debugging API Calls
+
+Debug builds log OpenWeather request and response metadata to Logcat with the tag `WeatherApi`. The logger redacts secret query/body fields such as `appid`, `api_key`, `key`, and `token` before writing logs. For failed HTTP responses, it also logs the sanitized error body to help diagnose issues such as `401 Unauthorized`.
+
 ## Assumptions
 
 - The app derives local severe-weather signals from wind, gusts, precipitation probability, and thunderstorm weather codes rather than relying on provider alert bulletins.
