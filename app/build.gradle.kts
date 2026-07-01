@@ -15,6 +15,10 @@ val localProperties = Properties().apply {
 val weatherApiKey = localProperties.getProperty("WEATHER_API_KEY")
     ?: System.getenv("WEATHER_API_KEY")
     ?: ""
+val buildSanitizedApk = providers.gradleProperty("sanitizeWeatherApiKey")
+    .map { it.toBoolean() }
+    .getOrElse(false)
+val weatherApiKeyForBuild = if (buildSanitizedApk) "" else weatherApiKey
 
 fun String.asBuildConfigString(): String =
     "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
@@ -34,7 +38,7 @@ android {
         buildConfigField(
             "String",
             "WEATHER_API_KEY",
-            weatherApiKey.asBuildConfigString(),
+            weatherApiKeyForBuild.asBuildConfigString(),
         )
     }
 

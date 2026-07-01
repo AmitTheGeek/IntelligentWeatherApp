@@ -2,6 +2,13 @@
 
 Native Android weather intelligence app built for the assignment brief. It provides current conditions, hourly and weekly forecasts, offline-first cached access, smart refresh, dynamic weather styling, periodic background sync, and locally derived severe-weather notifications.
 
+## Submission Links
+
+- Demo video: [Google Drive](https://drive.google.com/file/d/1HBL-_XqbjhIqLvaHgofCBnTU5tPOLjGB/view?usp=sharing)
+- APK artifact: [`deliverables/advanced-weather-intelligence-debug-sanitized.apk`](deliverables/advanced-weather-intelligence-debug-sanitized.apk)
+
+The committed APK is sanitized and does not contain the OpenWeather API key. To create a fully functional local APK, add `WEATHER_API_KEY` to `local.properties` and run `./gradlew assembleDebug`.
+
 ## Features
 
 - Current weather for any searched city.
@@ -71,6 +78,12 @@ The debug APK is generated at:
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
+```
+
+To generate a repo-safe APK without embedding the API key:
+
+```bash
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew assembleDebug -PsanitizeWeatherApiKey=true
 ```
 
 ## Debugging API Calls
