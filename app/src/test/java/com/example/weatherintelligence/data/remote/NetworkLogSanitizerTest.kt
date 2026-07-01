@@ -8,7 +8,7 @@ class NetworkLogSanitizerTest {
     @Test
     fun `redacts appid query value from urls`() {
         val sanitized = NetworkLogSanitizer.sanitizeUrl(
-            "https://api.openweathermap.org/data/3.0/onecall?lat=12&appid=secret-value&units=metric",
+            "https://api.openweathermap.org/data/2.5/forecast?lat=12&appid=secret-value&units=metric",
         )
 
         assertTrue(sanitized.contains("appid=<redacted>"))

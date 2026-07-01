@@ -450,7 +450,7 @@ private fun HourlyChart(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Hourly temperature",
+                text = "3-hour forecast",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -555,7 +555,7 @@ private fun WeeklyForecast(daily: List<DailyForecast>, card: Color, onCard: Colo
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = "7-day outlook",
+                text = "Daily outlook",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )

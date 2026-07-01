@@ -5,8 +5,8 @@ Native Android weather intelligence app built for the assignment brief. It provi
 ## Features
 
 - Current weather for any searched city.
-- 24-hour forecast with a Compose temperature chart and precipitation bars.
-- 7-day outlook with min/max temperatures and rain probability.
+- 5-day / 3-hour forecast with a Compose temperature chart and precipitation bars.
+- Daily outlook aggregated from free forecast windows with min/max temperatures and rain probability.
 - Offline-first cache backed by a local SQLite database.
 - Cache-per-city rows with last-updated timestamps.
 - Smart refresh using a 30-minute TTL.
@@ -50,7 +50,8 @@ Do not commit API keys, paste them into README files, or log them from the app. 
 Endpoints used:
 
 - Geocoding: `https://api.openweathermap.org/geo/1.0/direct`
-- Forecast: `https://api.openweathermap.org/data/3.0/onecall`
+- Current weather: `https://api.openweathermap.org/data/2.5/weather`
+- Forecast: `https://api.openweathermap.org/data/2.5/forecast`
 
 ## Setup
 
@@ -78,6 +79,7 @@ Debug builds log OpenWeather request and response metadata to Logcat with the ta
 
 ## Assumptions
 
+- The app uses OpenWeather's free current weather and 5-day / 3-hour forecast endpoints. Daily forecast cards are aggregated locally from 3-hour forecast windows.
 - The app derives local severe-weather signals from wind, gusts, precipitation probability, and thunderstorm weather codes rather than relying on provider alert bulletins.
 - The cache TTL is 30 minutes, which balances freshness and network usage for an assignment app.
 - Searched city names are normalized and used as cache keys. The resolved city metadata and coordinates are stored with the cached forecast.

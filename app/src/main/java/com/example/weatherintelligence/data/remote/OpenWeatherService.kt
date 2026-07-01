@@ -14,11 +14,18 @@ interface GeocodingService {
 }
 
 interface ForecastService {
-    @GET("data/3.0/onecall")
+    @GET("data/2.5/weather")
+    suspend fun currentWeather(
+        @Query("lat") latitude: Double,
+        @Query("lon") longitude: Double,
+        @Query("units") units: String = "metric",
+        @Query("appid") apiKey: String,
+    ): CurrentWeatherResponse
+
+    @GET("data/2.5/forecast")
     suspend fun forecast(
         @Query("lat") latitude: Double,
         @Query("lon") longitude: Double,
-        @Query("exclude") exclude: String = "minutely",
         @Query("units") units: String = "metric",
         @Query("appid") apiKey: String,
     ): ForecastResponse
@@ -32,44 +39,58 @@ data class GeocodingResult(
     val state: String? = null,
 )
 
+data class CurrentWeatherResponse(
+    val coord: CoordinateDto? = null,
+    val weather: List<WeatherConditionDto> = emptyList(),
+    val main: TemperatureDto? = null,
+    val wind: WindDto? = null,
+    val dt: Long? = null,
+    val timezone: Int? = null,
+    val name: String? = null,
+    val sys: SystemDto? = null,
+)
+
 data class ForecastResponse(
+    val list: List<ForecastItemDto> = emptyList(),
+    val city: ForecastCityDto? = null,
+)
+
+data class ForecastItemDto(
+    val dt: Long? = null,
+    val main: TemperatureDto? = null,
+    val wind: WindDto? = null,
+    val pop: Double? = null,
+    val weather: List<WeatherConditionDto> = emptyList(),
+    @SerializedName("dt_txt") val dateText: String? = null,
+)
+
+data class ForecastCityDto(
+    val name: String? = null,
+    val country: String? = null,
+    val coord: CoordinateDto? = null,
+    val timezone: Int? = null,
+)
+
+data class CoordinateDto(
     val lat: Double? = null,
     val lon: Double? = null,
-    val timezone: String? = null,
-    val current: CurrentDto? = null,
-    val hourly: List<HourlyDto> = emptyList(),
-    val daily: List<DailyDto> = emptyList(),
 )
 
-data class CurrentDto(
-    val dt: Long? = null,
+data class TemperatureDto(
     val temp: Double? = null,
     @SerializedName("feels_like") val feelsLike: Double? = null,
+    @SerializedName("temp_min") val tempMin: Double? = null,
+    @SerializedName("temp_max") val tempMax: Double? = null,
     val humidity: Int? = null,
-    @SerializedName("wind_speed") val windSpeed: Double? = null,
-    @SerializedName("wind_gust") val windGust: Double? = null,
-    val weather: List<WeatherConditionDto> = emptyList(),
 )
 
-data class HourlyDto(
-    val dt: Long? = null,
-    val temp: Double? = null,
-    val pop: Double? = null,
-    @SerializedName("wind_speed") val windSpeed: Double? = null,
-    val weather: List<WeatherConditionDto> = emptyList(),
+data class WindDto(
+    val speed: Double? = null,
+    val gust: Double? = null,
 )
 
-data class DailyDto(
-    val dt: Long? = null,
-    val temp: DailyTemperatureDto? = null,
-    val pop: Double? = null,
-    @SerializedName("wind_speed") val windSpeed: Double? = null,
-    val weather: List<WeatherConditionDto> = emptyList(),
-)
-
-data class DailyTemperatureDto(
-    val min: Double? = null,
-    val max: Double? = null,
+data class SystemDto(
+    val country: String? = null,
 )
 
 data class WeatherConditionDto(
